@@ -1,0 +1,98 @@
+# Queue Management System
+
+[![CI](https://github.com/qtrcipher/queue-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/qtrcipher/queue-management-system/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+Queue Management System is open-source queue management for physical and virtual queues. It is built for self-hosted branches that need kiosk check-in, staff counter workflows, public displays, QR/web joining, and Arabic/English support.
+
+## Status
+
+This repository is an early public MVP scaffold. It includes a working TypeScript monorepo, NestJS API, React/Vite web app, Prisma schema, Docker Compose services, seed data, and project governance files.
+
+## Development Quick Start
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm db:generate
+docker compose up -d postgres redis mailpit
+pnpm db:push
+pnpm db:seed
+pnpm dev
+```
+
+- Web app: http://localhost:5173
+- API health: http://localhost:3000/health
+- Mailpit: http://localhost:8025
+
+## Full Docker Quick Start
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+- Web app: http://localhost:8080
+- API health: http://localhost:3000/health
+- Mailpit: http://localhost:8025
+
+The local Compose file explicitly sets `QMS_AUTO_DB_SYNC=true`, so the API container applies the Prisma schema and loads seed data on startup for development. Use `docker compose ps` to confirm `api`, `web`, `postgres`, and `redis` are healthy or running before testing browser flows. Replace development secrets in `.env` before any production deployment.
+
+Useful web routes:
+
+- `/kiosk`: touch-first ticket creation
+- `/staff`: staff queue controls
+- `/display`: public waiting-room display
+- `/admin`: branch, service, and counter setup
+- `/join/main`: customer QR join flow for the seeded branch
+- `/ticket/:id`: customer ticket status, position, and ETA
+- `/analytics/summary`: protected operational analytics API with optional `start`, `end`, and `branchId` filters
+- `/analytics/tickets.csv`: protected ticket CSV export with the same filters
+
+Seed admin:
+
+- Email: `admin@example.com`
+- Password: `admin12345`
+
+## Features
+
+- Multi-branch, multi-service, multi-counter queue model
+- Kiosk ticket creation, appointment scheduling, and QR/web join flow
+- QR ticket tracking with queue position and estimated wait time
+- Protected staff actions: counter selection, call next, recall, start, complete, no-show, requeue, cancel, transfer
+- Role-based access control for owners, admins, branch managers, agents, and display users
+- Admin creation and editing for services, counters, user roles, and appointments
+- Basic analytics for issued tickets, completion/no-show rates, wait time, service time, branch/date filtering, multi-branch dashboards, and CSV export
+- Configurable ticket retention and manual purge for old terminal tickets
+- Public display state and customer ticket tracking
+- Built-in email/password session auth with httpOnly cookies
+- WebSocket queue updates
+- Arabic/English UI with RTL/LTR direction switching
+- SMTP email provider plus mock, webhook, or disabled SMS/WhatsApp provider plugins
+- Audit and ticket event history foundation
+
+## Repository Layout
+
+```text
+apps/api      NestJS API, Prisma schema, seed data
+apps/web      React + Vite single-page app
+packages/domain  Shared queue types and state helpers
+packages/ui       Shared UI primitives
+infra         Deployment, backup, restore, and operations notes
+research      Product research references
+```
+
+Operational guides:
+
+- [Infrastructure](infra/README.md)
+- [Production Deployment](infra/production.md)
+- [Public Demo Environment](infra/demo.md)
+- [Backup and Restore](infra/backup-restore.md)
+
+## Community
+
+QMS is maintained as an open-source project under Apache-2.0. Contributions use DCO signoff instead of a CLA. See [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md), and [ROADMAP.md](ROADMAP.md).
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
