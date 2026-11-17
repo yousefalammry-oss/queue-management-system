@@ -1198,12 +1198,23 @@ type AppContext = {
 };
 
 async function loadPublicBranch() {
-  const slug = window.location.pathname.startsWith("/join/") || window.location.pathname.startsWith("/display/")
-    ? window.location.pathname.split("/").at(-1)
-    : undefined;
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  const isJoinOrDisplay = parts[0] === "join" || parts[0] === "display";
+  const potentialSlug = isJoinOrDisplay ? parts[1] : undefined;
+  
+  // إذا كان المسار /join/quick، فلا نعتبر "quick" اسم فرع لكي يتم جلب الفرع الافتراضي
+  const slug = potentialSlug && potentialSlug !== "quick" ? potentialSlug : undefined;
+
   const path = slug ? `/public/branches/${slug}` : "/public/bootstrap";
-  const data = await api<{ branch: Branch | null }>(path);
-  return data.branch;
+  try {
+    const data = await api<{ branch: Branch | null; organization?: { branches: Branch[] } }>(path);
+    if (data.branch) return data.branch;
+    if (data.organization?.branches?.[0]) return data.organization.branches[0];
+    return null;
+  } catch {
+    const fallback = await api<{ branch: Branch | null }>(`/public/bootstrap`);
+    return fallback.branch;
+  }
 }
 
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
