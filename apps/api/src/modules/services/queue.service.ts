@@ -23,6 +23,13 @@ interface ScheduleAppointmentInput {
   customerEmail?: string;
 }
 
+interface QuickJoinInput {
+  branchId: string;
+  serviceId?: string;
+  customerName?: string;
+  customerPhone?: string;
+}
+
 type PublicTicketInput = Pick<Ticket,
   "id" | "branchId" | "serviceId" | "counterId" | "source" | "number" | "code" | "status" |
   "scheduledFor" | "checkedInAt" | "createdAt" | "issuedAt" | "calledAt" | "startedAt" | "completedAt"
@@ -78,7 +85,7 @@ export class QueueService {
 
     const issuedAt = scheduledFor ?? new Date();
     const date = sequenceDate(issuedAt);
-    // Sequence upserts serialize on the row lock, so the default isolation level is sufficient here.
+    
     const ticket = await this.prisma.$transaction(async (tx) => {
       const sequence = await tx.ticketSequence.upsert({
         where: { branchId_serviceId_date: { branchId: input.branchId, serviceId: input.serviceId, date } },
@@ -115,7 +122,6 @@ export class QueueService {
       return created;
     });
 
-    // Fire-and-forget: notifications must not block ticket issuance. Failures are logged inside the service.
     void this.notifications.sendTicketCreated({
       customerEmail: input.customerEmail,
       customerPhone: input.customerPhone,
@@ -126,6 +132,29 @@ export class QueueService {
     });
     this.emitTicket("ticket.created", ticket);
     return ticket;
+  }
+
+  // ميزة الحجز الفوري السريع عبر مسح الباركود (البيجر الرقمي)
+  async quickJoin(input: QuickJoinInput) {
+    let serviceId = input.serviceId;
+
+    if (!serviceId) {
+      const defaultService = await this.prisma.service.findFirst({
+        where: { branchId: input.branchId, isActive: true },
+      });
+      if (!defaultService) {
+        throw new NotFoundException("No active services available for this branch");
+      }
+      serviceId = defaultService.id;
+    }
+
+    return this.createTicket({
+      branchId: input.branchId,
+      serviceId,
+      customerName: input.customerName || "Digital Pager Guest",
+      customerPhone: input.customerPhone,
+      source: "WALK_IN",
+    });
   }
 
   scheduleAppointment(input: ScheduleAppointmentInput) {
@@ -210,8 +239,7 @@ export class QueueService {
     await this.assertServiceInOrganization(serviceId, organizationId, branchId);
     if (counterId) await this.assertCounterInOrganization(counterId, organizationId, branchId);
     const now = new Date();
-    // Guarded claim: updateMany only succeeds if the ticket is still waiting, so a concurrent
-    // caller gets count 0 and moves on to the next ticket instead of double-calling.
+    
     const ticket = await this.prisma.$transaction(async (tx) => {
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const next = await tx.ticket.findFirst({
