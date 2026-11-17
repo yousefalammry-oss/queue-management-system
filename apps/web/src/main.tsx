@@ -145,7 +145,7 @@ function App() {
         {path.startsWith("/display") ? <DisplayPage {...context} /> : null}
         {path.startsWith("/ticket/") ? <TicketPage ticketId={path.split("/").at(-1) ?? ""} /> : null}
         {path.startsWith("/join/quick") ? <QuickJoinPage branch={branch} setMessage={setMessage} /> : null}
-        {path.startsWith("/join") || path.startsWith("/kiosk") || path === "/" ? <KioskPage {...context} /> : null}
+        {((path.startsWith("/join") && !path.startsWith("/join/quick")) || path.startsWith("/kiosk") || path === "/") ? <KioskPage {...context} /> : null}
       </main>
     </>
   );
@@ -155,7 +155,7 @@ function Shell({ user, branch, path, onLanguage }: { user: User | null; branch: 
   const { i18n, t } = useTranslation();
   const branchName = localName(branch, i18n.language);
   const navItems = [
-    { href: "/kiosk", label: t("kiosk"), active: path === "/" || path.startsWith("/kiosk") || path.startsWith("/join") },
+    { href: "/kiosk", label: t("kiosk"), active: path === "/" || path.startsWith("/kiosk") || (path.startsWith("/join") && !path.startsWith("/join/quick")) },
     { href: "/staff", label: t("staff"), active: path.startsWith("/staff") },
     { href: "/display", label: t("display"), active: path.startsWith("/display") },
     { href: "/admin", label: t("admin"), active: path.startsWith("/admin") }
