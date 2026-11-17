@@ -33,6 +33,23 @@ class CreateTicketDto {
   customerEmail?: string;
 }
 
+class QuickJoinDto {
+  @IsString()
+  branchId!: string;
+
+  @IsString()
+  @IsOptional()
+  serviceId?: string;
+
+  @IsString()
+  @IsOptional()
+  customerName?: string;
+
+  @IsString()
+  @IsOptional()
+  customerPhone?: string;
+}
+
 @Controller("tickets")
 export class TicketsController {
   private readonly publicTicketAttempts = new Map<string, PublicTicketAttempt>();
@@ -43,6 +60,13 @@ export class TicketsController {
   create(@Req() request: Request, @Body() body: CreateTicketDto) {
     this.assertPublicTicketAllowed(clientIdentifier(request));
     return this.queue.createTicket(body);
+  }
+
+  // مسار البيجر الرقمي والحجز السريع عبر مسح الباركود
+  @Post("quick-join")
+  quickJoin(@Req() request: Request, @Body() body: QuickJoinDto) {
+    this.assertPublicTicketAllowed(clientIdentifier(request));
+    return this.queue.quickJoin(body);
   }
 
   @Get(":ticketId")
