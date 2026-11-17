@@ -144,6 +144,7 @@ function App() {
         {path.startsWith("/staff") ? <StaffPage {...context} /> : null}
         {path.startsWith("/display") ? <DisplayPage {...context} /> : null}
         {path.startsWith("/ticket/") ? <TicketPage ticketId={path.split("/").at(-1) ?? ""} /> : null}
+        {path.startsWith("/join/quick") ? <QuickJoinPage branch={branch} setMessage={setMessage} /> : null}
         {path.startsWith("/join") || path.startsWith("/kiosk") || path === "/" ? <KioskPage {...context} /> : null}
       </main>
     </>
@@ -186,7 +187,6 @@ function Shell({ user, branch, path, onLanguage }: { user: User | null; branch: 
 
 function LoginPanel({ onLogin }: { onLogin: (user: User) => void }) {
   const { t } = useTranslation();
-  // Demo credentials are pre-filled in development only, never in production bundles.
   const [email, setEmail] = useState(import.meta.env.DEV ? "admin@example.com" : "");
   const [password, setPassword] = useState(import.meta.env.DEV ? "admin12345" : "");
   const [error, setError] = useState("");
@@ -231,7 +231,7 @@ function KioskPage({ branch, setMessage }: AppContext) {
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const services = branch?.services ?? [];
-  const joinUrl = `${window.location.origin}/join/${branch?.slug ?? "main"}`;
+  const joinUrl = `${window.location.origin}/join/quick`;
   const ticketUrl = createdTicket ? `${window.location.origin}/ticket/${createdTicket.id}` : joinUrl;
 
   async function createTicket(serviceId: string) {
@@ -288,12 +288,71 @@ function KioskPage({ branch, setMessage }: AppContext) {
           </>
         ) : (
           <>
-            <span>{t("customer")}</span>
-            <QrPanel value={joinUrl} label={t("scanJoinPhone")} />
-            <small>{new URL(joinUrl).pathname}</small>
+            <span>Customer (Digital Pager)</span>
+            <QrPanel value={joinUrl} label="Scan to join instantly from phone" />
+            <small>/join/quick</small>
           </>
         )}
       </div>
+    </section>
+  );
+}
+
+// مكون البيجر الرقمي والحجز الفوري عبر الباركود
+function QuickJoinPage({ branch, setMessage }: { branch: Branch | null; setMessage: (msg: string) => void }) {
+  const { i18n, t } = useTranslation();
+  const [ticket, setTicket] = useState<TicketRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!branch) return;
+
+    const savedTicketKey = `active_ticket_${branch.id}`;
+    const savedTicket = localStorage.getItem(savedTicketKey);
+    if (savedTicket) {
+      setTicket(JSON.parse(savedTicket));
+      setLoading(false);
+      return;
+    }
+
+    api<TicketRecord>("/tickets/quick-join", {
+      method: "POST",
+      body: { branchId: branch.id }
+    })
+      .then((createdTicket) => {
+        setTicket(createdTicket);
+        localStorage.setItem(savedTicketKey, JSON.stringify(createdTicket));
+        setMessage(t("ticketCreated", { code: createdTicket.code }));
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("فشل إصدار التذكرة الفورية، يرجى المحاولة لاحقاً.");
+        setLoading(false);
+      });
+  }, [branch]);
+
+  if (!branch) return <EmptyState label={t("noBranchConfigured") || "لا يوجد فرع معرف"} />;
+  if (loading) return <EmptyState label="جاري إصدار تذكرتك الرقمية الفورية..." />;
+  if (error) return <EmptyState label={error} />;
+
+  const trackingUrl = `${window.location.origin}/ticket/${ticket?.id}`;
+
+  return (
+    <section className="ticket-page" aria-live="polite">
+      <span>{t("yourTicket")}</span>
+      <strong>{ticket?.code}</strong>
+      <p>{ticket?.status} · {localName(ticket?.service, i18n.language)}</p>
+      <div className="status-metrics">
+        <div>
+          <span>{t("branch")}</span>
+          <strong>{localName(branch, i18n.language)}</strong>
+        </div>
+      </div>
+      <QrPanel value={trackingUrl} label={t("ticketTrackingLink")} />
+      <p style={{ marginTop: "20px", fontSize: "14px", color: "var(--muted)" }}>
+        ابق هذه الصفحة مفتوحة. سيصلك تنبيه النداء فوراً عند استدعائك.
+      </p>
     </section>
   );
 }
